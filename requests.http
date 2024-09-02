@@ -1,0 +1,11 @@
+curl -X POST http://localhost:3000/generate-pdf \
+-H "Content-Type: application/json" \
+-d '{
+  "clientName": "John Doe",
+  "vendorName": "Acme Corp",
+  "vendorPhone": "+123456789",
+  "items": [
+    {"id": "1", "description": "Item 1", "unitValue": 10.0, "quantity": 2},
+    {"id": "2", "description": "Item 2", "unitValue": 15.0, "quantity": 1}
+  ]
+}'
