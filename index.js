@@ -24,10 +24,26 @@ app.post('/generate-pdf', async (req, res) => {
 
 
         let id = 0
+        let totalValue = 0
         const tableItems = items.map((item) => {
             id++
+            totalValue += item.quantity * item.unitValue
             return [id, item.description, new Intl.NumberFormat('pt-Br', { style: 'currency', currency: 'BRL'}).format(item.unitValue), item.quantity]
         })
+
+        tableItems.push([
+            '',
+            '',
+            {
+                colSpan: 2,
+                text: `Valor Total: ${new Intl.NumberFormat('pt-Br', { style: 'currency', currency: 'BRL'}).format(totalValue)}`,
+                bold: true,
+                fontSize: 14,
+                alignment: 'right',
+                margin: [0, 20, 0, 0]
+            }
+        ])
+
         var dd = {
             pageMargins: [20, 30, 20, 20], // [left, top, right, bottom]
             content: [
@@ -63,7 +79,7 @@ app.post('/generate-pdf', async (req, res) => {
                                 { text: 'Valor unitário', bold: true },
                                 { text: 'Qtd.', bold: true }
                             ],
-                            ...tableItems
+                            ...tableItems,
                             // Add more rows as needed
                         ]
                     },
