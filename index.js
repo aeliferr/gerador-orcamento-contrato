@@ -13,10 +13,10 @@ app.post('/generate-pdf', async (req, res) => {
         // Define font files
         var fonts = {
             Roboto: {
-                normal: 'fonts/Roboto-Regular.ttf',
-                bold: 'fonts/Roboto-Medium.ttf',
-                italics: 'fonts/Roboto-Italic.ttf',
-                bolditalics: 'fonts/Roboto-MediumItalic.ttf'
+                normal: `${__dirname}/fonts/Roboto-Regular.ttf`,
+                bold: `${__dirname}/fonts/Roboto-Medium.ttf`,
+                italics: `${__dirname}/fonts/Roboto-Italic.ttf`,
+                bolditalics: `${__dirname}/fonts/Roboto-MediumItalic.ttf`
             }
         };
 
@@ -48,7 +48,7 @@ app.post('/generate-pdf', async (req, res) => {
             pageMargins: [20, 30, 20, 20], // [left, top, right, bottom]
             content: [
                 {
-                    image: 'logo_artfaav_rgb.png',
+                    image: `${__dirname}/logo_artfaav_rgb.png`,
                     width: 150,
                     style: 'center'
                 },
