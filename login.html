@@ -77,9 +77,6 @@
     <p id="login-message"></p>
     <p id="user-role"></p>
   </div>
-  psql -U postgres
-CREATE DATABASE auth_system;
-\c auth_system
 
   <script>
     document.getElementById('login-form').addEventListener('submit', async (event) => {
@@ -92,10 +89,9 @@ CREATE DATABASE auth_system;
         body: JSON.stringify({ username, password })
       });
       if (response.ok) {
-        const { token, role } = await response.json();
+        const { token } = await response.json();
         localStorage.setItem('authToken', token);
         document.getElementById('login-message').textContent = 'Login successful!';
-        document.getElementById('user-role').textContent = `Role: ${role}`;
       } else {
         document.getElementById('login-message').textContent = 'Invalid credentials';
         document.getElementById('user-role').textContent = '';
