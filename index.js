@@ -1,11 +1,31 @@
 const PdfPrinter = require('pdfmake');
 const express = require('express');
-var cors = require('cors')
 const bodyParser = require('body-parser');
-
+const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { pool } = require('./marcenariadb');
 const app = express();
+
 app.use(bodyParser.json());
-app.use(cors())
+app.use(cors());
+
+// Login endpoint
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+    const user = result.rows[0];
+    if (!user || !bcrypt.compareSync(password, user.password)) {
+      return res.status(401).send('Invalid credentials');
+    }
+    const token = jwt.sign({ user }, 'secret_key', { expiresIn: '8h' });
+    res.json({ token });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Server error');
+  }
+});
 
 app.post('/generate-pdf', async (req, res) => {
     try {
@@ -28,14 +48,20 @@ app.post('/generate-pdf', async (req, res) => {
         const tableItems = items.map((item) => {
             id++
             totalValue += item.quantity * item.unitValue
-            return [id, item.description, new Intl.NumberFormat('pt-Br', { style: 'currency', currency: 'BRL'}).format(item.unitValue), item.quantity]
+            return [
+                id,
+                item.description,
+                { text: new Intl.NumberFormat('pt-Br', { style: 'currency', currency: 'BRL'}).format(item.unitValue), alignment: 'right' },
+                item.quantity,
+                { text: new Intl.NumberFormat('pt-Br', { style: 'currency', currency: 'BRL'}).format(item.quantity * item.unitValue), alignment: 'right' }
+            ]
         })
 
         tableItems.push([
             '',
             '',
             {
-                colSpan: 2,
+                colSpan: 3,
                 text: `Valor Total: ${new Intl.NumberFormat('pt-Br', { style: 'currency', currency: 'BRL'}).format(totalValue)}`,
                 bold: true,
                 fontSize: 14,
@@ -46,6 +72,7 @@ app.post('/generate-pdf', async (req, res) => {
 
         var dd = {
             pageMargins: [20, 30, 20, 20], // [left, top, right, bottom]
+            pageSize: 'A4',
             content: [
                 {
                     image: `${__dirname}/logo_artfaav_rgb.png`,
@@ -58,7 +85,7 @@ app.post('/generate-pdf', async (req, res) => {
                     alignment: 'left'
                 },
                 {
-                    text: `Data de validade: ${new Date().toLocaleDateString()}`,
+                    text: `Data de validade: ${new Date().toLocaleDateString('pt-Br')}`,
                     style: 'subheader',
                     alignment: 'left'
                 },
@@ -71,13 +98,14 @@ app.post('/generate-pdf', async (req, res) => {
                     margin: [0, 20, 0, 0],
                     table: {
                         headerRows: 1,
-                        widths: [20, 350, '*', 30],
+                        widths: [15, '*', 75, 25, 100],
                         body: [
                             [
                                 { text: 'ID', bold: true },
                                 { text: 'Descrição', bold: true },
-                                { text: 'Valor unitário', bold: true },
-                                { text: 'Qtd.', bold: true }
+                                { text: 'Valor unitário', bold: true, alignment: 'right' },
+                                { text: 'Qtd.', bold: true },
+                                { text: 'Total', bold: true, alignment: 'right' }
                             ],
                             ...tableItems,
                             // Add more rows as needed
