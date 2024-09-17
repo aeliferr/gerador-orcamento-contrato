@@ -1,0 +1,18 @@
+on:
+  push:
+    branches:
+      - main  # Set the branch you want to deploy from
+
+jobs:
+  run_example_job:
+    runs-on: ubuntu-latest
+    steps:
+    - name: print out example job
+      uses: appleboy/ssh-action@v0.1.10
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: | 
+          cd /var/apps/
+          ./publish_app.sh
