@@ -5,31 +5,117 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { pool } = require('./marcenariadb');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+const SECRET_KEY = 'secret_key'
+
 const app = express();
+
 
 app.use(bodyParser.json());
 app.use(cors());
 
 // Login endpoint
 app.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  try {
-    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
-    const user = result.rows[0];
-    if (!user || !bcrypt.compareSync(password, user.password)) {
-      return res.status(401).send('Invalid credentials');
+    const { username, password } = req.body;
+    try {
+        const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+        const user = result.rows[0];
+        if (!user || !bcrypt.compareSync(password, user.password)) {
+            return res.status(401).send('Invalid credentials');
+        }
+        const token = jwt.sign({ user }, SECRET_KEY, { expiresIn: '8h' });
+        res.json({ token });
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Server error');
     }
-    const token = jwt.sign({ user }, 'secret_key', { expiresIn: '8h' });
-    res.json({ token });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Server error');
-  }
 });
 
-app.post('/generate-pdf', async (req, res) => {
+// Middleware to verify JWT token
+function verifyToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    
+    jwt.verify(token, SECRET_KEY, (err, decoded) => {
+      if (err) {
+        return res.status(403).json({ message: 'Invalid or expired token' });
+      }
+      
+      req.user = decoded;  // Attach decoded user info to the request
+      next();  // Proceed to next middleware or route
+    });
+  } else {
+    return res.status(401).json({ message: 'No token provided' });
+  }
+}
+
+app.use(verifyToken);
+
+app.post('/budget', async (req, res) => {
     try {
-        const {vendorName, clientName, items } = req.body
+        const { clientName, budgetItems } = req.body
+
+        const { user } = req.user
+            
+        const budget = {
+            clientName,
+            vendorId: user.id,
+            budgetItems
+        }
+
+        await prisma.budget.create({
+            data: {
+                clientName,
+                vendorId: user.id,
+                budgetItems: {
+                    create: budget.budgetItems
+                }
+            }
+        })
+
+        res.status(200).send()
+    } catch (error) {
+        console.log(error)
+        res.status(400).json(error)
+    }
+})
+
+app.get('/budget', async (req, res) => {
+    try {
+        const { user } = req.user
+
+        const result = await prisma.budget.findMany({
+            where: user.role === 'vendor' ? { vendorId: user.id } : {},
+            include: {
+                budgetItems: true,
+                vendor: true
+            }
+        })
+
+        res.json(result)
+    } catch (error) {
+        console.error(error);
+        res.status(500).json(error);
+    }
+});
+
+app.get('/budget/:id/print', async (req, res) => {
+    try {
+        const { id } = req.params
+        
+        const budget = await prisma.budget.findUnique({
+            where: {
+                id
+            },
+            include: {
+                vendor: true,
+                budgetItems: true
+            }
+        })
+
         // Define font files
         var fonts = {
             Roboto: {
@@ -43,13 +129,14 @@ app.post('/generate-pdf', async (req, res) => {
         var printer = new PdfPrinter(fonts);
 
 
-        let id = 0
+        let itemId = 0
         let totalValue = 0
-        const tableItems = items.map((item) => {
-            id++
+        
+        const budgetItems = budget.budgetItems.map((item) => {
+            itemId++
             totalValue += item.quantity * item.unitValue
             return [
-                id,
+                itemId,
                 item.description,
                 { text: new Intl.NumberFormat('pt-Br', { style: 'currency', currency: 'BRL'}).format(item.unitValue), alignment: 'right' },
                 item.quantity,
@@ -57,7 +144,7 @@ app.post('/generate-pdf', async (req, res) => {
             ]
         })
 
-        tableItems.push([
+        budgetItems.push([
             '',
             '',
             {
@@ -80,7 +167,7 @@ app.post('/generate-pdf', async (req, res) => {
                     style: 'center'
                 },
                 {
-                    text: `Cliente: ${clientName}`,
+                    text: `Cliente: ${budget.clientName}`,
                     style: 'subheader',
                     alignment: 'left'
                 },
@@ -90,7 +177,7 @@ app.post('/generate-pdf', async (req, res) => {
                     alignment: 'left'
                 },
                 {
-                    text: `Vendedor: ${vendorName}`,
+                    text: `Vendedor: ${budget.vendor.fullName}`,
                     style: 'subheader',
                     alignment: 'left'
                 },
@@ -107,7 +194,7 @@ app.post('/generate-pdf', async (req, res) => {
                                 { text: 'Qtd.', bold: true },
                                 { text: 'Total', bold: true, alignment: 'right' }
                             ],
-                            ...tableItems,
+                            ...budgetItems,
                             // Add more rows as needed
                         ]
                     },
