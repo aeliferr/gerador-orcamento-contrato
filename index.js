@@ -94,6 +94,52 @@ app.post('/budget', async (req, res) => {
     }
 })
 
+app.put('/budget/:id', async (req, res) => {
+    try {
+        const { id } = req.params
+        const { clientName, budgetItems } = req.body
+
+        const { user } = req.user
+            
+        const budget = {
+            clientName,
+            vendorId: user.id,
+            budgetItems
+        }
+
+        const ids = budget.budgetItems.filter((item) => {
+            return !!item.id
+        }).map((item) => {
+            return item.id
+        })
+
+        const itemsToUpdate = budget.budgetItems.filter((item) => {
+            return !!item.id
+        })
+
+        await prisma.budget.update({
+            where: {
+                id
+            },
+            data: {
+                budgetItems: {
+                    deleteMany: {
+                        budgetId: id
+                    },
+                    createMany: {
+                        data: budget.budgetItems
+                    },
+                },
+            }
+        })
+
+        res.status(200).send()
+    } catch (error) {
+        console.log(error)
+        res.status(400).json(error)
+    }
+})
+
 app.get('/budget', async (req, res) => {
     try {
         const { user } = req.user
@@ -107,6 +153,27 @@ app.get('/budget', async (req, res) => {
         })
 
         res.json(result)
+    } catch (error) {
+        console.error(error);
+        res.status(500).json(error);
+    }
+});
+
+app.get('/budget/:id', async (req, res) => {
+    try {
+        const { id } = req.params
+        
+        const budget = await prisma.budget.findUnique({
+            where: {
+                id
+            },
+            include: {
+                vendor: true,
+                budgetItems: true
+            }
+        })
+
+        res.json(budget)
     } catch (error) {
         console.error(error);
         res.status(500).json(error);
