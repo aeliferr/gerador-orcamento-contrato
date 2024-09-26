@@ -54,6 +54,17 @@ function verifyToken(req, res, next) {
 
 app.use(verifyToken);
 
+app.get('/me', async (req, res) => {
+    const { user } = req.user
+    const { fullName, role} = await prisma.user.findUnique({
+        where: {
+            id: user.id
+        }
+    })
+
+    res.json({ fullName, role})
+})
+
 app.post('/budget', async (req, res) => {
     try {
         const { clientName, budgetItems } = req.body
